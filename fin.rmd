@@ -1,0 +1,101 @@
+---
+title: "Practical_Machine_Learning"
+author: "Supharerk Thawillarp"
+date: "28 February 2016"
+output: html_document
+---
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data preparation
+
+First, lets load needed library for this assignment. Training and testing data were loaded with NA replacemnet for null data.
+
+```{r }
+#Load require package
+library(caret)
+library(rattle)
+library(rpart)
+```
+
+```{r }
+#Load data
+train_data_org<-read.csv("pml-training.csv",na.strings=c("NA",""))
+test_data_org<-read.csv("pml-testing.csv",na.strings=c("NA",""))
+```
+
+
+The training set contains 19622 rows and 160 features while the testing data set contains 20 rows and 160 features.
+
+
+###Data cleaning
+
+After exploring some features, the first 7 features were excluded due to its irrelevant to outcome. Data frame columns containing NA were removed as well.
+
+```{r}
+train_data_org<-train_data_org[,8:length(train_data_org)]
+train_data_org<-train_data_org[,sapply(train_data_org,function(x) !any(is.na(x)))]
+```
+
+
+We split training data in to train and validation set with 70% goes to training data.
+
+```{r}
+trainIndex<-createDataPartition(train_data_org$classe,p=0.7,list=F)
+train_data<-train_data_org[trainIndex,]
+valid_data<-train_data_org[-trainIndex,]
+
+```
+
+
+##Modeling
+
+###Cross validation
+To save some computation time, I'm going to use cross validation. I use the default k=10 argument
+```{r}
+control<-trainControl(method="cv",number=10)
+```
+
+
+###Decision Tree
+Let's start with a basic decision tree.
+```{r}
+dc_tree<-train(classe~.,data=train_data,method="rpart",trControl=control)
+fancyRpartPlot(dc_tree$finalModel)
+```
+
+```{r}
+dc_tree
+```
+
+Unfortunately the accuracy is really bad (0.5), we should go with other model.
+```{r}
+confusionMatrix(predict(dc_tree,valid_data),valid_data$classe)
+```
+
+###Random Forest
+
+I choose the popular random forest as the second choice.
+
+```{r}
+rf_model<-train(classe~.,data=train_data,method="rf",trControl=control)
+rf_model
+```
+
+```{r}
+confusionMatrix(predict(rf_model,valid_data),valid_data$classe)
+```
+
+This model is a lot better. Its accuracy is 0.99, we are going to use this one for prediction.
+
+##Prediction
+
+Lets predict the classe for testing data set
+
+```{r}
+predict(rf_model,test_data_org)
+```
+
+
